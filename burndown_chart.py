@@ -1,0 +1,186 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+import os
+
+class BurndownChartError(Exception):
+    """Custom exception for Burndown Chart related errors"""
+    pass
+
+class BurndownChart:
+    def __init__(self, project_name, start_date, end_date, total_story_points):
+        """
+        Initialize a Burndown Chart for project tracking
+        
+        :param project_name: Name of the project
+        :param start_date: Project start date
+        :param end_date: Project end date
+        :param total_story_points: Total story points for the project
+        """
+        # Input validation
+        if not project_name or not isinstance(project_name, str):
+            raise BurndownChartError("Project name must be a non-empty string")
+        
+        if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
+            raise BurndownChartError("Start and end dates must be datetime objects")
+        
+        if start_date >= end_date:
+            raise BurndownChartError("Start date must be before end date")
+        
+        if not isinstance(total_story_points, (int, float)) or total_story_points <= 0:
+            raise BurndownChartError("Total story points must be a positive number")
+        
+        self.project_name = project_name
+        self.start_date = start_date
+        self.end_date = end_date
+        self.total_story_points = float(total_story_points)
+        
+        # Create initial dataframe for tracking
+        self.df = self._create_initial_dataframe()
+        
+        # Track progress updates
+        self.progress_log = []
+    
+    def _create_initial_dataframe(self):
+        """
+        Create initial dataframe with project timeline and ideal burndown
+        """
+        date_range = pd.date_range(start=self.start_date, end=self.end_date)
+        total_days = len(date_range)
+        
+        # Create ideal burndown line
+        ideal_burndown = [self.total_story_points - (self.total_story_points * day / (total_days - 1)) 
+                          for day in range(total_days)]
+        
+        df = pd.DataFrame({
+            'Date': date_range,
+            'Ideal_Burndown': ideal_burndown,
+            'Actual_Burndown': ideal_burndown.copy()
+        })
+        
+        return df
+    
+    def update_progress(self, date, completed_story_points, description=None):
+        """
+        Update actual progress for a specific date
+        
+        :param date: Date of progress update
+        :param completed_story_points: Story points completed by this date
+        :param description: Optional description of the progress update
+        """
+        # Input validation
+        if not isinstance(date, datetime):
+            raise BurndownChartError("Date must be a datetime object")
+        
+        if not isinstance(completed_story_points, (int, float)) or completed_story_points < 0:
+            raise BurndownChartError("Completed story points must be a non-negative number")
+        
+        if completed_story_points > self.total_story_points:
+            raise BurndownChartError("Completed story points cannot exceed total story points")
+        
+        # Ensure date is within project timeline
+        if date < self.start_date or date > self.end_date:
+            raise BurndownChartError("Progress update date must be within project timeline")
+        
+        # Log the progress update
+        progress_entry = {
+            'date': date,
+            'completed_points': completed_story_points,
+            'description': description
+        }
+        self.progress_log.append(progress_entry)
+        
+        # Update the dataframe
+        mask = self.df['Date'] == pd.to_datetime(date)
+        if mask.any():
+            self.df.loc[mask, 'Actual_Burndown'] = self.total_story_points - completed_story_points
+    
+    def generate_chart(self, output_file='burndown_chart.png', show_progress_points=True):
+        """
+        Generate and save burndown chart
+        
+        :param output_file: File path to save the chart
+        :param show_progress_points: Whether to show individual progress points
+        """
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
+        
+        plt.figure(figsize=(12, 7))
+        plt.plot(self.df['Date'], self.df['Ideal_Burndown'], 
+                 label='Ideal Burndown', color='blue', linestyle='--')
+        plt.plot(self.df['Date'], self.df['Actual_Burndown'], 
+                 label='Actual Burndown', color='red', marker='o')
+        
+        # Optionally show progress points
+        if show_progress_points:
+            progress_dates = [entry['date'] for entry in self.progress_log]
+            progress_points = [self.total_story_points - entry['completed_points'] for entry in self.progress_log]
+            plt.scatter(progress_dates, progress_points, color='green', s=100, zorder=5, 
+                        label='Progress Updates', marker='x')
+        
+        plt.title(f'Burndown Chart - {self.project_name}')
+        plt.xlabel('Date')
+        plt.ylabel('Remaining Story Points')
+        plt.legend()
+        plt.xticks(rotation=45)
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        
+        plt.savefig(output_file, dpi=300)
+        plt.close()
+        
+        print(f"Burndown chart saved to {output_file}")
+    
+    def get_progress_summary(self):
+        """
+        Generate a summary of project progress
+        
+        :return: Dictionary with progress statistics
+        """
+        if not self.progress_log:
+            return {
+                'total_story_points': self.total_story_points,
+                'completed_story_points': 0,
+                'progress_percentage': 0
+            }
+        
+        latest_progress = self.progress_log[-1]
+        return {
+            'total_story_points': self.total_story_points,
+            'completed_story_points': latest_progress['completed_points'],
+            'progress_percentage': (latest_progress['completed_points'] / self.total_story_points) * 100
+        }
+
+def main():
+    # Example usage with more detailed progress tracking
+    start_date = datetime(2024, 1, 1)
+    end_date = datetime(2024, 1, 31)
+    
+    try:
+        burndown = BurndownChart(
+            project_name="Sample Project", 
+            start_date=start_date, 
+            end_date=end_date, 
+            total_story_points=100
+        )
+        
+        # Simulate progress updates with descriptions
+        burndown.update_progress(datetime(2024, 1, 7), 30, "Completed backend infrastructure")
+        burndown.update_progress(datetime(2024, 1, 14), 60, "Implemented core features")
+        burndown.update_progress(datetime(2024, 1, 21), 85, "Added user interface")
+        burndown.update_progress(datetime(2024, 1, 28), 100, "Final testing and deployment")
+        
+        # Generate chart
+        burndown.generate_chart('burndown_chart.png')
+        
+        # Print progress summary
+        progress_summary = burndown.get_progress_summary()
+        print("\nProject Progress Summary:")
+        for key, value in progress_summary.items():
+            print(f"{key.replace('_', ' ').title()}: {value}")
+        
+    except BurndownChartError as e:
+        print(f"Error creating burndown chart: {e}")
+
+if __name__ == "__main__":
+    main()
