@@ -49,6 +49,11 @@ def main():
             start_datetime = datetime.combine(start_date, datetime.min.time())
             end_datetime = datetime.combine(end_date, datetime.min.time())
 
+            # Validate date range
+            if start_datetime >= end_datetime:
+                st.error("End date must be after start date")
+                return
+
             # Create Burndown Chart
             burndown = BurndownChart(
                 project_name=project_name, 
@@ -59,11 +64,12 @@ def main():
 
             # Add Progress Updates
             for update in progress_updates:
-                burndown.update_progress(
-                    date=datetime.combine(update['date'], datetime.min.time()),
-                    completed_story_points=update['completed_points'],
-                    description=update.get('description', '')
-                )
+                if update.get('date') and update.get('completed_points') is not None:
+                    burndown.update_progress(
+                        date=datetime.combine(update['date'], datetime.min.time()),
+                        completed_story_points=update['completed_points'],
+                        description=update.get('description', '')
+                    )
 
             # Generate Chart
             chart_filename = f"{project_name.replace(' ', '_')}_burndown.png"
@@ -88,6 +94,4 @@ def main():
     st.markdown("🔧 Built with ❤️ by Burndown Chart Generator")
 
 if __name__ == "__main__":
-    # Render requires binding to 0.0.0.0
-    port = int(os.environ.get("PORT", 8501))
-    st.run(port=port, host="0.0.0.0")
+    main()
