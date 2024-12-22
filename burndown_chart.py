@@ -46,15 +46,16 @@ class BurndownChart:
         :param end_date: Project end date
         :param total_story_points: Total story points for the project
         """
-        # Input validation
+        # Input validation with more flexible handling
         if not project_name or not isinstance(project_name, str):
             raise BurndownChartError("Project name must be a non-empty string")
         
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise BurndownChartError("Start and end dates must be datetime objects")
         
+        # Automatically adjust end date if it's before or equal to start date
         if start_date >= end_date:
-            raise BurndownChartError("Start date must be before end date")
+            end_date = start_date + timedelta(days=14)
         
         if not isinstance(total_story_points, (int, float)) or total_story_points <= 0:
             raise BurndownChartError("Total story points must be a positive number")
@@ -142,7 +143,8 @@ class BurndownChart:
         
         # Ensure date is within project timeline
         if date < self.start_date or date > self.end_date:
-            raise BurndownChartError("Progress update date must be within project timeline")
+            # Adjust date to project timeline if out of bounds
+            date = max(min(date, self.end_date), self.start_date)
         
         # Log the progress update
         progress_entry = {

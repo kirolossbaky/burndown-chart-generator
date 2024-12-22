@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from burndown_chart import BurndownChart, Task, BurndownChartError
 from trello_integration import TrelloIntegration, authenticate_trello
 
@@ -59,7 +59,14 @@ def main():
         start_date = st.date_input("Project Start Date", datetime.now())
     
     with col2:
-        end_date = st.date_input("Project End Date", datetime.now())
+        # Default end date to 2 weeks after start date
+        default_end_date = start_date + timedelta(days=14)
+        end_date = st.date_input("Project End Date", default_end_date)
+
+    # Validate date range
+    if start_date >= end_date:
+        st.error("End date must be after start date. Adjusting end date automatically.")
+        end_date = start_date + timedelta(days=14)
 
     # Task Management Section
     st.subheader("🛠 Task Management")
@@ -69,13 +76,24 @@ def main():
     task_complexity = st.selectbox("Task Complexity", ["Easy", "Medium", "Hard"])
     
     # Initialize burndown chart
-    burndown = BurndownChart(
-        project_name=project_name, 
-        start_date=datetime.combine(start_date, datetime.min.time()), 
-        end_date=datetime.combine(end_date, datetime.min.time()), 
-        total_story_points=total_story_points
-    )
-    
+    try:
+        burndown = BurndownChart(
+            project_name=project_name, 
+            start_date=datetime.combine(start_date, datetime.min.time()), 
+            end_date=datetime.combine(end_date, datetime.min.time()), 
+            total_story_points=total_story_points
+        )
+    except BurndownChartError as e:
+        st.error(f"Error creating burndown chart: {e}")
+        # Fallback to automatic date adjustment
+        end_date = start_date + timedelta(days=14)
+        burndown = BurndownChart(
+            project_name=project_name, 
+            start_date=datetime.combine(start_date, datetime.min.time()), 
+            end_date=datetime.combine(end_date, datetime.min.time()), 
+            total_story_points=total_story_points
+        )
+
     # Task Creation and Estimation
     col1, col2 = st.columns(2)
     with col1:
