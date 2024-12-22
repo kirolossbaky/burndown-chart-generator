@@ -1,8 +1,15 @@
 import streamlit as st
+import os
 from datetime import datetime
 from burndown_chart import BurndownChart, BurndownChartError
 
 def main():
+    st.set_page_config(
+        page_title="Burndown Chart Generator", 
+        page_icon="📊", 
+        layout="wide"
+    )
+    
     st.title("🚀 Burndown Chart Generator")
     st.markdown("Create and visualize your project's progress!")
 
@@ -76,5 +83,11 @@ def main():
         except Exception as e:
             st.error(f"Unexpected error: {e}")
 
+    # Footer
+    st.markdown("---")
+    st.markdown("🔧 Built with ❤️ by Burndown Chart Generator")
+
 if __name__ == "__main__":
-    main()
+    # Render requires binding to 0.0.0.0
+    port = int(os.environ.get("PORT", 8501))
+    st.run(port=port, host="0.0.0.0")
