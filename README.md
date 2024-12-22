@@ -4,7 +4,7 @@
 A web-based tool to create and visualize project burndown charts, helping teams track progress and manage project timelines.
 
 ## 🌐 Live Demo
-[Burndown Chart Generator](https://burndown-chart-generator.onrender.com)
+[Burndown Chart Generator](https://share.streamlit.io/kirolossbaky/burndown-chart-generator/main/app.py)
 
 ## Features
 - Interactive web interface
@@ -14,14 +14,12 @@ A web-based tool to create and visualize project burndown charts, helping teams 
 
 ## Deployment
 
-### Render (Free Hosting)
+### Streamlit Sharing (Free Hosting)
 1. Fork this repository
-2. Create a new Web Service on Render
-3. Connect your GitHub repository
-4. Use the following settings:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `streamlit run app.py`
-   - Python Version: 3.9
+2. Sign up at [Streamlit Sharing](https://streamlit.io/sharing)
+3. Connect your GitHub account
+4. Select this repository
+5. Choose `main/app.py` as the entry point
 
 ### Local Development
 1. Clone the repository
