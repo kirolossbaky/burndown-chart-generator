@@ -1,17 +1,17 @@
 import streamlit as st
 import os
 from datetime import datetime
-from burndown_chart import BurndownChart, BurndownChartError
+from burndown_chart import BurndownChart, Task, BurndownChartError
 
 def main():
     st.set_page_config(
-        page_title="Burndown Chart Generator", 
+        page_title="Advanced Burndown Chart Generator", 
         page_icon="📊", 
         layout="wide"
     )
     
-    st.title("🚀 Burndown Chart Generator")
-    st.markdown("Create and visualize your project's progress!")
+    st.title("🚀 Advanced Burndown Chart Generator")
+    st.markdown("Create, track, and analyze your project's progress with precision!")
 
     # Project Details Input
     col1, col2 = st.columns(2)
@@ -29,8 +29,41 @@ def main():
     with col2:
         end_date = st.date_input("Project End Date", datetime.now())
 
-    # Progress Tracking
-    st.subheader("Progress Updates")
+    # Task Management Section
+    st.subheader("🛠 Task Management")
+    
+    # Task Input
+    task_name = st.text_input("Task Name")
+    task_complexity = st.selectbox("Task Complexity", ["Easy", "Medium", "Hard"])
+    
+    # Initialize burndown chart
+    burndown = BurndownChart(
+        project_name=project_name, 
+        start_date=datetime.combine(start_date, datetime.min.time()), 
+        end_date=datetime.combine(end_date, datetime.min.time()), 
+        total_story_points=total_story_points
+    )
+    
+    # Task Creation and Estimation
+    if st.button("Add Task"):
+        try:
+            # Estimate points based on complexity
+            estimated_points = burndown.estimate_complexity_points(task_complexity.lower())
+            
+            # Create and add task
+            task = Task(
+                name=task_name, 
+                estimated_points=estimated_points,
+                complexity=task_complexity.lower()
+            )
+            burndown.add_task(task)
+            
+            st.success(f"Task '{task_name}' added with {estimated_points} estimated points")
+        except BurndownChartError as e:
+            st.error(f"Error adding task: {e}")
+
+    # Progress Updates
+    st.subheader("📈 Progress Updates")
     progress_updates = st.data_editor(
         data=[],
         num_rows="dynamic",
@@ -45,22 +78,13 @@ def main():
     # Generate Chart Button
     if st.button("Generate Burndown Chart"):
         try:
-            # Convert dates to datetime
+            # Validate date range
             start_datetime = datetime.combine(start_date, datetime.min.time())
             end_datetime = datetime.combine(end_date, datetime.min.time())
 
-            # Validate date range
             if start_datetime >= end_datetime:
                 st.error("End date must be after start date")
                 return
-
-            # Create Burndown Chart
-            burndown = BurndownChart(
-                project_name=project_name, 
-                start_date=start_datetime, 
-                end_date=end_datetime, 
-                total_story_points=total_story_points
-            )
 
             # Add Progress Updates
             for update in progress_updates:
@@ -75,14 +99,36 @@ def main():
             chart_filename = f"{project_name.replace(' ', '_')}_burndown.png"
             burndown.generate_chart(chart_filename)
 
-            # Display Chart and Summary
+            # Display Chart
             st.image(chart_filename)
 
             # Show Progress Summary
             summary = burndown.get_progress_summary()
-            st.subheader("Project Progress Summary")
-            for key, value in summary.items():
-                st.metric(label=key.replace('_', ' ').title(), value=value)
+            st.subheader("🔍 Project Progress Summary")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Story Points", summary['total_story_points'])
+            with col2:
+                st.metric("Completed Points", summary['completed_story_points'])
+            with col3:
+                st.metric("Progress", f"{summary['progress_percentage']:.2f}%")
+            with col4:
+                st.metric("Est. vs Actual Variance", f"{summary['estimated_vs_actual_variance']:.2f}%")
+
+            # Task Details
+            st.subheader("📋 Task Breakdown")
+            task_data = []
+            for task in burndown.tasks:
+                task_data.append({
+                    "Name": task.name,
+                    "Complexity": task.complexity,
+                    "Estimated Points": task.estimated_points,
+                    "Actual Points": task.actual_points or "Not Completed",
+                    "Status": task.status
+                })
+            
+            st.dataframe(task_data)
 
         except BurndownChartError as e:
             st.error(f"Error creating burndown chart: {e}")
@@ -91,7 +137,7 @@ def main():
 
     # Footer
     st.markdown("---")
-    st.markdown("🔧 Built with ❤️ by Burndown Chart Generator")
+    st.markdown("🔧 Built with ❤️ by Advanced Burndown Chart Generator")
 
 if __name__ == "__main__":
     main()

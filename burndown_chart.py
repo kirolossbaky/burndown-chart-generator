@@ -1,11 +1,40 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from datetime import datetime, timedelta
-import os
 
 class BurndownChartError(Exception):
     """Custom exception for Burndown Chart related errors"""
     pass
+
+class Task:
+    def __init__(self, name, estimated_points, actual_points=None, complexity=None):
+        """
+        Represents a single task in the project
+        
+        :param name: Task name
+        :param estimated_points: Points estimated for the task
+        :param actual_points: Actual points taken to complete the task
+        :param complexity: Task complexity (easy, medium, hard)
+        """
+        self.name = name
+        self.estimated_points = estimated_points
+        self.actual_points = actual_points
+        self.complexity = complexity
+        self.status = 'Not Started'
+        self.start_date = None
+        self.end_date = None
+
+    def complete(self, actual_points=None, end_date=None):
+        """
+        Mark task as completed
+        
+        :param actual_points: Actual points taken
+        :param end_date: Date of completion
+        """
+        self.status = 'Completed'
+        self.actual_points = actual_points or self.estimated_points
+        self.end_date = end_date or datetime.now()
 
 class BurndownChart:
     def __init__(self, project_name, start_date, end_date, total_story_points):
@@ -35,11 +64,43 @@ class BurndownChart:
         self.end_date = end_date
         self.total_story_points = float(total_story_points)
         
+        # Task management
+        self.tasks = []
+        self.progress_log = []
+        
         # Create initial dataframe for tracking
         self.df = self._create_initial_dataframe()
+    
+    def add_task(self, task):
+        """
+        Add a task to the project
         
-        # Track progress updates
-        self.progress_log = []
+        :param task: Task object to add
+        """
+        if not isinstance(task, Task):
+            raise BurndownChartError("Must provide a Task object")
+        
+        self.tasks.append(task)
+        return task
+    
+    def estimate_complexity_points(self, complexity):
+        """
+        Estimate points based on task complexity
+        
+        :param complexity: Task complexity (easy, medium, hard)
+        :return: Estimated story points
+        """
+        complexity_map = {
+            'easy': (1, 3),
+            'medium': (3, 8),
+            'hard': (8, 13)
+        }
+        
+        if complexity.lower() not in complexity_map:
+            raise BurndownChartError("Invalid complexity. Choose from: easy, medium, hard")
+        
+        min_points, max_points = complexity_map[complexity.lower()]
+        return np.random.randint(min_points, max_points + 1)
     
     def _create_initial_dataframe(self):
         """
@@ -55,7 +116,8 @@ class BurndownChart:
         df = pd.DataFrame({
             'Date': date_range,
             'Ideal_Burndown': ideal_burndown,
-            'Actual_Burndown': ideal_burndown.copy()
+            'Actual_Burndown': ideal_burndown.copy(),
+            'Estimated_Burndown': ideal_burndown.copy()
         })
         
         return df
@@ -102,20 +164,25 @@ class BurndownChart:
         :param output_file: File path to save the chart
         :param show_progress_points: Whether to show individual progress points
         """
-        # Ensure output directory exists
-        os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
+        plt.figure(figsize=(14, 8))
         
-        plt.figure(figsize=(12, 7))
+        # Ideal Burndown Line
         plt.plot(self.df['Date'], self.df['Ideal_Burndown'], 
                  label='Ideal Burndown', color='blue', linestyle='--')
+        
+        # Actual Burndown Line
         plt.plot(self.df['Date'], self.df['Actual_Burndown'], 
                  label='Actual Burndown', color='red', marker='o')
+        
+        # Estimated Burndown Line
+        plt.plot(self.df['Date'], self.df['Estimated_Burndown'], 
+                 label='Estimated Burndown', color='green', linestyle=':')
         
         # Optionally show progress points
         if show_progress_points:
             progress_dates = [entry['date'] for entry in self.progress_log]
             progress_points = [self.total_story_points - entry['completed_points'] for entry in self.progress_log]
-            plt.scatter(progress_dates, progress_points, color='green', s=100, zorder=5, 
+            plt.scatter(progress_dates, progress_points, color='purple', s=100, zorder=5, 
                         label='Progress Updates', marker='x')
         
         plt.title(f'Burndown Chart - {self.project_name}')
@@ -141,14 +208,22 @@ class BurndownChart:
             return {
                 'total_story_points': self.total_story_points,
                 'completed_story_points': 0,
-                'progress_percentage': 0
+                'progress_percentage': 0,
+                'estimated_vs_actual_variance': 0
             }
         
         latest_progress = self.progress_log[-1]
+        
+        # Calculate estimated vs actual variance
+        total_estimated = sum(task.estimated_points for task in self.tasks)
+        total_actual = sum(task.actual_points or task.estimated_points for task in self.tasks)
+        variance = abs(total_estimated - total_actual) / total_estimated * 100 if total_estimated else 0
+        
         return {
             'total_story_points': self.total_story_points,
             'completed_story_points': latest_progress['completed_points'],
-            'progress_percentage': (latest_progress['completed_points'] / self.total_story_points) * 100
+            'progress_percentage': (latest_progress['completed_points'] / self.total_story_points) * 100,
+            'estimated_vs_actual_variance': variance
         }
 
 def main():
@@ -163,6 +238,21 @@ def main():
             end_date=end_date, 
             total_story_points=100
         )
+        
+        # Create tasks with complexity-based estimation
+        task1 = burndown.add_task(Task(
+            name="Backend Infrastructure", 
+            estimated_points=burndown.estimate_complexity_points('hard'),
+            complexity='hard'
+        ))
+        task1.complete(actual_points=10, end_date=datetime(2024, 1, 7))
+        
+        task2 = burndown.add_task(Task(
+            name="Core Features", 
+            estimated_points=burndown.estimate_complexity_points('medium'),
+            complexity='medium'
+        ))
+        task2.complete(actual_points=15, end_date=datetime(2024, 1, 14))
         
         # Simulate progress updates with descriptions
         burndown.update_progress(datetime(2024, 1, 7), 30, "Completed backend infrastructure")
